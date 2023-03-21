@@ -1,0 +1,236 @@
+---
+title: "Final Project"
+author: "Hoin Lee & Changbin Kim"
+date: "13/DEC/2022"
+output: html_notebook
+---
+
+### Setting
+```{r}
+# load all packages here: `mosaic`, `tidyverse`, `lubridate`, and all others used
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(dplyr)
+library(esquisse)
+library(mosaic)
+library(mosaicData)
+library(dcData)
+```
+
+```{r}
+primary <- Provisional_COVID_19_Deaths_by_Sex_and_Age
+death <- read_csv("United_States_COVID-19_Cases_and_Deaths_by_State_over_Time_-_ARCHIVED.csv")
+condition <- Conditions_Contributing_to_COVID_19_Deaths_by_State_and_Age_Provisional_2020_2022
+population <- poppulation_by_state
+```
+
+### Guiding Question
+It's been several years since the pandemic hit the world. What kind of groups in US were impacted most from Covid-19?
+
+### Inspecting Data
+```{r}
+head(primary)
+str(primary)
+```
+The data provides the number of death by week-ending date and state.
+The number of deaths reported in this table is the total number of deaths received and coded as of the date of analysis.
+ 
+Starting from January 2022, there has been a huge inflated number of deaths from Covid-19 in the US. As a result, the number of deaths in the US has also increased. When we are investigating whether the Covid-patients are decreasing or increasing, we need to watch out for the outliers in the dataset, where there has been a sudden increasing rate of deaths. 
+
+```{r}
+head(death)
+str(death)
+```
+The data provides the number of cases and deaths by the state over time in the US. 
+The dataset contains archived aggregate daily counts of COVID-19 cases and death by the state.
+
+There is a US Jurisdiction(Puerto Rico) that is officially not a US state. In order to analyze, we need to eliminate the Jusrsdictions that are not US states.
+
+```{r}
+head(condition)
+str(condition)
+```
+This data set shows the health conditions and contributing causes of deaths involving COVID-19 by age group and occurrence.
+
+```{r}
+head(population)
+str(population)
+```
+The data provides the total number of resident population by state. 
+
+
+### Clearing data 
+In order to get clear output, we removed all of each overlapped values and each data set's outlier because there are some overlapped datas from in our data set and the outlier would lead to mess our output. 
+
+### 1. The number of COVID patient between 2020/01/01 and 2022/11/12
+### Death by age
+```{r}
+Primary <-
+  primary %>% 
+  filter(State != "United States")
+
+Primary <-
+  Primary %>% 
+  filter(State != "Puerto Rico")
+
+Primarya <-
+  Primary %>% 
+  filter(`End Date` == "11/12/2022")
+
+Primarya <-
+  Primarya %>% 
+  filter(`Start Date` == "01/01/2020")
+
+PrimaryaR <-
+  Primarya %>%
+  group_by(Sex,`Age Group`) %>%
+  summarise(total = sum(`COVID-19 Deaths`, na.rm = TRUE)) %>% 
+  filter(Sex %in% c('Male','Female')) %>% 
+  filter(`Age Group` %in% c("0-17 years", "18-29 years", "30-39 years", "40-49 years", "50-64 years", "65-74 years", "75-84 years", "85 years and over") )
+
+PrimaryaR1 <-
+  PrimaryaR %>% 
+  relocate(`Age Group`)
+
+Death_by_Age <-
+  PrimaryaR1 %>% 
+  pivot_wider(names_from = Sex, values_from = total) %>% 
+  mutate(total = Female + Male)
+
+Death_by_Age
+```
+Overlapping data: "United States, Puerto Rico, All sexes" and also the time period of start and end date are overlapped, so we filter the start date with "01/01/2020" and the end date with "11/12/2022". About age group, there are also overlapped data of age interval, so we filter out the specific age interval: "0-17 years", "18-29 years", "30-39 years", "40-49 years", "50-64 years", "65-74 years", "75-84 years", "85 years and over".
+
+```{r}
+ggplot(Death_by_Age) +
+  aes(x = `Age Group`, y = total, fill = `Age Group`) +
+  geom_col() +
+  scale_fill_hue(direction = 1) +
+  labs(title = "Death by Age") +
+  theme_minimal()
+
+```
+The data shows that people who are over 50 years old have a high percentage of death from COVID-19. 
+Overall, we were able to find out the elder people are more likely to die from COVID-19; especially those over 50 years old, and its number of counts is greatly increased.
+ 
+ 
+### Death by sex
+```{r}
+Death_by_sex <-
+  PrimaryaR1 %>% 
+  group_by(Sex) %>% 
+  summarise(Total = sum(total))
+
+Death_by_sex
+
+```
+```{r}
+ggplot(Death_by_sex) +
+  aes(x = Sex, y = Total, fill = Sex) +
+  geom_col() +
+  scale_fill_hue(direction = 1) +
+  labs(title = "Death by Sex") +
+  theme_minimal()
+```
+According to the US census("https://www.statista.com/statistics/737923/us-population-by-gender/#:~:text=Projection%20estimates%20calculated%20using%20the,US%20Census%20data%20for%202021."), they calculated each gender's population, and population ratio is about 49.5% male and 50.47 female. the number of males and females in the United States is most likely the same. However, the graph shows that a number of males had died than females. Based on this graph, we may conclude that COVID-19 lead male to die at a higher percentage compared to female. 
+
+### Death by state
+```{r}
+Primary3 <-
+  Primary2 %>%
+  group_by(`State`) %>%
+  summarise(total = sum(`COVID-19 Deaths`, na.rm = TRUE)) %>% 
+  arrange(desc(total))
+
+Primary3
+```
+```{r}
+ggplot(Primary3) +
+  aes(x = total, y = State) +
+  geom_boxplot(fill = "#112446") +
+  labs(title = "Death by States") +
+  theme_minimal()
+
+```
+Using the "arrange" function, we easily find out which state has the most number of death from COVID-19. Obviously, the population by the state would affect the number of death by state because the population by the state is mostly proportional to the number of death by the state. The data shows that the major states have a high number of deaths by COVID-19 considering their dense populations.
+
+### 2. Number of deaths by each States. 
+### Geographically distribution
+```{r}
+mUSMap(Primary3, key="State", fill = "total") 
+```
+The first U.S. map illustrates the distribution of the number of death by each state. The obvious fact is that the number of death is directly proportional to each state's population. If the color of the state is closer to light blue, the number of death is higher, and if the color of the state is closer to dark blue, the number of death is lower. Based on the above map, we are able to figure out the distribution of the number of death by each state easily and emphasize the big states, such as CA, TX, and FL, are vulnerable condition with COVID-19.
+
+### Deathratio by state 
+```{r}
+DeathRatioState <-
+  Primary3 %>% 
+  inner_join(pop, by = c("State" = "table with row headers in column A and column headers in rows 3 through 5. (leading dots indicate sub-parts)")) %>%
+  arrange(desc(total))
+DeathRatioState
+```
+
+### Geographically Distribution of Death Ratio by State 
+```{r}
+DeathRatioState <-
+  Primary3 %>% 
+  inner_join(population)
+
+DeathRatioState1 <-
+  DeathRatioState %>% 
+  mutate(ratio = total / `Total Resident
+ Population`)
+
+mUSMap(DeathRatioState1, key = "State", fill = "ratio")
+```
+```{r}
+DeathRatioState1 %>% 
+  select('State', 'ratio') %>% 
+  arrange(desc(ratio))
+```
+The above map illustrates the geographically distribution of death ratio by state. If the color of the state is closer to light blue, the death ratio is higher, and if the color of the state is closer to dark blue, the death ratio is lower. The purpose of illustrating the map is to express which state has the most number of death ratio that would decide where is the most vulnerable condition with COVID-19 because each state's death ratio is calculated from the number of death by state divided by population of state. Surprisingly, contrary to expectations, MS, OK, WV, and the other small states have the high death ratio. Based on this table, perhaps, the small states have more vulnerable condition with COVID-19 than big states.
+
+
+
+
+### Death by body condition 
+```{r}
+condition1 <-
+  condition %>% 
+  filter(`Age Group` == 'All Ages') %>% 
+  filter(State == 'United States') %>% 
+  filter(row_number() <= 23)
+condition2 <-
+  condition1 %>%
+  group_by(`Condition`) %>% 
+  summarise(total = sum(`COVID-19 Deaths`, na.rm = TRUE))%>%
+  arrange(desc(total))
+condition2
+
+#filter(`Condition Group` != 'All other conditions and causes (residual)') %>% 
+#filter(`Condition Group` != 'Alzheimer disease') %>%
+
+```
+The table illustrates the number of death by the condition in descending order. The reason why the conditions besides COVID-19 is higher than the number of COVID-19 is there are people who have multiple diseases; there is no guarantee people have only one disease. The table shows who have influenza and pneumonia are the most contributing to Death by COVID-19. 
+
+
+### Which conditions(age, sex, state, body's condition, ratio) are mostly lead to die through COVID-19
+```{r}
+Primary1R
+Primary2R
+Primary3
+
+condition2 %>% 
+  arrange(desc(total))
+
+DeathRatioState1 %>% 
+  select('State', 'ratio') %>% 
+  arrange(desc(ratio))
+
+```
+
+
+### Conclusion
+It is been several years since the pandemic hit the world. There were numerous casualties and infections around our life and the entire globe. From this motivation, Our research question is "What kind of groups in the US were impacted most by Covid-19?" According to these data outcomes, we are able to find out, in United states, the condition of '85 years and over' or 'male','who has influenza and pneumonia' or 'who lives in Mississippi' would have been mostly leading to death. 
+Additionally, based on this evidence from the data sets, we are able to emphasize that COVID-19 is one of the greatest prevalent diseases in any disease that humanity has experienced. For now, we may feel COVID-19 is a common disease, such as influenza. Based from our research, we learned that we still need a steady concern about Covid-19.
